@@ -41,6 +41,28 @@ function increaseSpecifityOfRule(rule, opts) {
 }
 
 
+function isExcludePath(path, excludePaths) {
+	if (!excludePaths || !path) return false;
+
+	// handle single rule
+	if (typeof excludePaths === 'string') {
+		return path === excludePaths;
+	}
+
+	// handle RegExp
+	if (typeof excludePaths.test === 'function') {
+		return Boolean(excludePaths.test(path));
+	}
+
+	// handle function
+	if (typeof excludePaths === 'function') {
+		return Boolean(excludePaths(path));
+	}
+
+	return false;
+}
+
+
 // Plugin that adds `:not(#\\9)` selectors to the front of the rule thus increasing specificity
 module.exports = postcss.plugin('postcss-increase-specificity', function(options) {
 	var defaults = {
@@ -49,12 +71,15 @@ module.exports = postcss.plugin('postcss-increase-specificity', function(options
 		// Whether to add !important to declarations in rules with id selectors
 		overrideIds: true,
 		// The thing we repeat over and over to make up the piece that increases specificity
-		stackableRoot: ':not(#' + CSS_ESCAPED_TAB + ')'
+		stackableRoot: ':not(#' + CSS_ESCAPED_TAB + ')',
+		excludePaths: null
 	};
 
 	var opts = objectAssign({}, defaults, options);
 
-	return function(css) {
+	return function(css, result) {
+		if (isExcludePath(result.opts.from, options.excludePaths)) return;
+
 		css.walkRules(function(rule) {
 			// Avoid adding additional selectors (stackableRoot) to descendant rules of @keyframe {}
 			// i.e. `from`, `to`, or `{number}%`
